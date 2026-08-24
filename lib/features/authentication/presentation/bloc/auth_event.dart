@@ -4,21 +4,17 @@ class AuthCheckRequested extends AuthEvent {}
 
 class AuthLoginRequested extends AuthEvent {
   final String email;
-  final String password;
 
   AuthLoginRequested({
     required this.email,
-    required this.password,
   });
 }
 
-class AuthSignupRequested extends AuthEvent {
-  final String email;
-  final String password;
+class AuthEmailLinkReceived extends AuthEvent {
+  final String emailLink;
 
-  AuthSignupRequested({
-    required this.email,
-    required this.password,
+  AuthEmailLinkReceived({
+    required this.emailLink,
   });
 }
 

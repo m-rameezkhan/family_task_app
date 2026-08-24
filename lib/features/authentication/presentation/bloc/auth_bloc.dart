@@ -1,5 +1,5 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/repositories/auth_repository.dart';
 import 'auth_event.dart';
@@ -13,7 +13,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }) : super(AuthInitial()) {
     on<AuthCheckRequested>(_onAuthCheckRequested);
     on<AuthLoginRequested>(_onLoginRequested);
-    on<AuthSignupRequested>(_onSignupRequested);
+    on<AuthEmailLinkReceived>(_onEmailLinkReceived);
     on<AuthLogoutRequested>(_onLogoutRequested);
   }
 
@@ -37,36 +37,90 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
 
     try {
-      final result = await _authRepository.signIn(
+      await _authRepository.sendSignInLink(
         email: event.email,
-        password: event.password,
       );
 
-      emit(AuthAuthenticated(result.user!));
+      emit(AuthLinkSent());
     } on FirebaseAuthException catch (e) {
-      emit(AuthFailure(e.message ?? 'Login failed.'));
+      emit(
+        AuthFailure(
+          e.message ?? 'Failed to send sign-in link.',
+        ),
+      );
     } catch (_) {
-      emit(AuthFailure('Something went wrong.'));
+      emit(
+        AuthFailure(
+          'Something went wrong while sending the sign-in link.',
+        ),
+      );
     }
   }
 
-  Future<void> _onSignupRequested(
-    AuthSignupRequested event,
+  Future<void> _onEmailLinkReceived(
+    AuthEmailLinkReceived event,
     Emitter<AuthState> emit,
   ) async {
     emit(AuthLoading());
 
     try {
-      final result = await _authRepository.signUp(
-        email: event.email,
-        password: event.password,
+      final isEmailLink = await _authRepository.isSignInWithEmailLink(
+        event.emailLink,
       );
 
-      emit(AuthAuthenticated(result.user!));
+      if (!isEmailLink) {
+        emit(
+          AuthFailure(
+            'Invalid sign-in link.',
+          ),
+        );
+        return;
+      }
+
+      final email = await _authRepository.getSavedEmail();
+
+      if (email == null || email.isEmpty) {
+        emit(
+          AuthFailure(
+            'Could not find the email used for sign-in.',
+          ),
+        );
+        return;
+      }
+
+      final result = await _authRepository.signInWithEmailLink(
+        email: email,
+        emailLink: event.emailLink,
+      );
+
+      await _authRepository.clearSavedEmail();
+
+      final user = result.user;
+
+      if (user == null) {
+        emit(
+          AuthFailure(
+            'Authentication failed.',
+          ),
+        );
+        return;
+      }
+
+      emit(
+        AuthAuthenticated(user),
+      );
     } on FirebaseAuthException catch (e) {
-      emit(AuthFailure(e.message ?? 'Signup failed.'));
+      emit(
+        AuthFailure(
+          e.message ?? 'Email link authentication failed.',
+        ),
+      );
     } catch (_) {
-      emit(AuthFailure('Something went wrong.'));
+      emit(
+        AuthFailure(
+          'Something went wrong while completing sign-in.',
+        ),
+      );
     }
   }
 
@@ -74,8 +128,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthLogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
-    await _authRepository.signOut();
+    try {
+      await _authRepository.signOut();
 
-    emit(AuthUnauthenticated());
+      emit(AuthUnauthenticated());
+    } catch (_) {
+      emit(
+        AuthFailure(
+          'Logout failed.',
+        ),
+      );
+    }
   }
 }

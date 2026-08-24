@@ -1,7 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthRepository {
   final FirebaseAuth _firebaseAuth;
+
+  static const String _emailForSignInKey = 'email_for_sign_in';
 
   AuthRepository({
     FirebaseAuth? firebaseAuth,
@@ -11,23 +14,56 @@ class AuthRepository {
 
   User? get currentUser => _firebaseAuth.currentUser;
 
-  Future<UserCredential> signIn({
+  Future<void> sendSignInLink({
     required String email,
-    required String password,
-  }) {
-    return _firebaseAuth.signInWithEmailAndPassword(
+  }) async {
+    final actionCodeSettings = ActionCodeSettings(
+      url: 'https://family-task-app-2026.firebaseapp.com',
+      handleCodeInApp: true,
+      androidPackageName: 'com.example.family_task_app',
+      androidInstallApp: true,
+    );
+
+    await _firebaseAuth.sendSignInLinkToEmail(
       email: email,
-      password: password,
+      actionCodeSettings: actionCodeSettings,
+    );
+
+    final preferences = await SharedPreferences.getInstance();
+
+    await preferences.setString(
+      _emailForSignInKey,
+      email,
     );
   }
 
-  Future<UserCredential> signUp({
+  Future<bool> isSignInWithEmailLink(String emailLink) async {
+    return _firebaseAuth.isSignInWithEmailLink(emailLink);
+  }
+
+  Future<UserCredential> signInWithEmailLink({
     required String email,
-    required String password,
+    required String emailLink,
   }) {
-    return _firebaseAuth.createUserWithEmailAndPassword(
+    return _firebaseAuth.signInWithEmailLink(
       email: email,
-      password: password,
+      emailLink: emailLink,
+    );
+  }
+
+  Future<String?> getSavedEmail() async {
+    final preferences = await SharedPreferences.getInstance();
+
+    return preferences.getString(
+      _emailForSignInKey,
+    );
+  }
+
+  Future<void> clearSavedEmail() async {
+    final preferences = await SharedPreferences.getInstance();
+
+    await preferences.remove(
+      _emailForSignInKey,
     );
   }
 
