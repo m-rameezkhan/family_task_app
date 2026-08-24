@@ -1,16 +1,30 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/task_model.dart';
 
 class TaskRemoteDataSource {
   final FirebaseFirestore _firestore;
+  final FirebaseAuth _firebaseAuth;
 
   TaskRemoteDataSource({
     FirebaseFirestore? firestore,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance;
+    FirebaseAuth? firebaseAuth,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance;
 
   CollectionReference<Map<String, dynamic>> get _tasksCollection =>
       _firestore.collection('tasks');
+
+  String get _currentUserId {
+    final user = _firebaseAuth.currentUser;
+
+    if (user == null) {
+      throw Exception('User is not authenticated.');
+    }
+
+    return user.uid;
+  }
 
   Future<TaskModel> createTask({
     required String title,
@@ -23,6 +37,7 @@ class TaskRemoteDataSource {
       title: title,
       deadline: deadline,
       createdAt: DateTime.now(),
+      createdBy: _currentUserId,
     );
 
     await document.set(task.toMap());
@@ -32,16 +47,15 @@ class TaskRemoteDataSource {
 
   Future<List<TaskModel>> getTasks() async {
     final snapshot = await _tasksCollection
-        .orderBy('createdAt', descending: true)
+        .where('createdBy', isEqualTo: _currentUserId)
         .get();
 
-    return snapshot.docs
-        .map(
-          (doc) => TaskModel.fromMap(
-            doc.id,
-            doc.data(),
-          ),
-        )
+    final tasks = snapshot.docs
+        .map((doc) => TaskModel.fromMap(doc.id, doc.data()))
         .toList();
+
+    tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    return tasks;
   }
 }
