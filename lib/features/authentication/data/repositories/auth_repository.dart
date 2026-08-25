@@ -6,19 +6,16 @@ class AuthRepository {
 
   static const String _emailForSignInKey = 'email_for_sign_in';
 
-  AuthRepository({
-    FirebaseAuth? firebaseAuth,
-  }) : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance;
+  AuthRepository({FirebaseAuth? firebaseAuth})
+    : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance;
 
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
 
   User? get currentUser => _firebaseAuth.currentUser;
 
-  Future<void> sendSignInLink({
-    required String email,
-  }) async {
+  Future<void> sendSignInLink({required String email}) async {
     final actionCodeSettings = ActionCodeSettings(
-      url: 'https://family-task-app-2026.firebaseapp.com',
+      url: 'https://family-task-app-2026.web.app',
       handleCodeInApp: true,
       androidPackageName: 'com.example.family_task_app',
       androidInstallApp: true,
@@ -31,10 +28,7 @@ class AuthRepository {
 
     final preferences = await SharedPreferences.getInstance();
 
-    await preferences.setString(
-      _emailForSignInKey,
-      email,
-    );
+    await preferences.setString(_emailForSignInKey, email);
   }
 
   Future<bool> isSignInWithEmailLink(String emailLink) async {
@@ -54,17 +48,13 @@ class AuthRepository {
   Future<String?> getSavedEmail() async {
     final preferences = await SharedPreferences.getInstance();
 
-    return preferences.getString(
-      _emailForSignInKey,
-    );
+    return preferences.getString(_emailForSignInKey);
   }
 
   Future<void> clearSavedEmail() async {
     final preferences = await SharedPreferences.getInstance();
 
-    await preferences.remove(
-      _emailForSignInKey,
-    );
+    await preferences.remove(_emailForSignInKey);
   }
 
   Future<void> signOut() {
