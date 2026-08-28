@@ -1,1 +1,26 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"family-task-app-2026","appId":"1:690447046120:android:32fd630a1dce033d07405d","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"family-task-app-2026","configurations":{"android":"1:690447046120:android:32fd630a1dce033d07405d","web":"1:690447046120:web:d54ab55df1e0e79707405d"}}}}}}
+{
+	"flutter": {
+		"platforms": {
+			"android": {
+				"default": {
+					"projectId": "family-task-app-2026",
+					"appId": "1:690447046120:android:32fd630a1dce033d07405d",
+					"fileOutput": "android/app/google-services.json"
+				}
+			},
+			"dart": {
+				"lib/firebase_options.dart": {
+					"projectId": "family-task-app-2026",
+					"configurations": {
+						"android": "1:690447046120:android:32fd630a1dce033d07405d",
+						"web": "1:690447046120:web:d54ab55df1e0e79707405d"
+					}
+				}
+			}
+		}
+	},
+	"functions": {
+		"source": "functions",
+		"runtime": "nodejs22"
+	}
+}

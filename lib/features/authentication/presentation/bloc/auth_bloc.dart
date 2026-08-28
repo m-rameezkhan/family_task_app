@@ -2,18 +2,22 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../data/repositories/auth_repository.dart';
+import '../../../../core/notifications/notification_service.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _authRepository;
 
-  AuthBloc({
-    required this._authRepository,
-  }) : super(AuthInitial()) {
+  final NotificationService? _notificationService;
+
+  AuthBloc({required this._authRepository, this._notificationService})
+    : super(AuthInitial()) {
     on<AuthCheckRequested>(_onAuthCheckRequested);
     on<AuthLoginRequested>(_onLoginRequested);
     on<AuthSignupRequested>(_onSignupRequested);
+    on<AuthGoogleLoginRequested>(_onGoogleLoginRequested);
+    on<AuthAppleLoginRequested>(_onAppleLoginRequested);
     on<AuthLogoutRequested>(_onLogoutRequested);
   }
 
@@ -24,6 +28,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final user = _authRepository.currentUser;
 
     if (user != null) {
+      await _notificationService?.registerUser(user.uid);
       emit(AuthAuthenticated(user));
     } else {
       emit(AuthUnauthenticated());
@@ -42,6 +47,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         password: event.password,
       );
 
+      await _notificationService?.registerUser(result.user!.uid);
       emit(AuthAuthenticated(result.user!));
     } on FirebaseAuthException catch (e) {
       emit(AuthFailure(e.message ?? 'Login failed.'));
@@ -58,10 +64,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     try {
       final result = await _authRepository.signUp(
+        name: event.name,
         email: event.email,
         password: event.password,
       );
 
+      await _notificationService?.registerUser(result.user!.uid);
       emit(AuthAuthenticated(result.user!));
     } on FirebaseAuthException catch (e) {
       emit(AuthFailure(e.message ?? 'Signup failed.'));
@@ -77,5 +85,44 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await _authRepository.signOut();
 
     emit(AuthUnauthenticated());
+  }
+
+  Future<void> _onGoogleLoginRequested(
+    AuthGoogleLoginRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    await _socialLogin(
+      _authRepository.signInWithGoogle,
+      emit,
+      'Google login failed.',
+    );
+  }
+
+  Future<void> _onAppleLoginRequested(
+    AuthAppleLoginRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    await _socialLogin(
+      _authRepository.signInWithApple,
+      emit,
+      'Apple login failed.',
+    );
+  }
+
+  Future<void> _socialLogin(
+    Future<UserCredential> Function() login,
+    Emitter<AuthState> emit,
+    String fallback,
+  ) async {
+    emit(AuthLoading());
+    try {
+      final result = await login();
+      await _notificationService?.registerUser(result.user!.uid);
+      emit(AuthAuthenticated(result.user!));
+    } on FirebaseAuthException catch (error) {
+      emit(AuthFailure(error.message ?? fallback));
+    } catch (_) {
+      emit(AuthFailure(fallback));
+    }
   }
 }

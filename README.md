@@ -1,6 +1,37 @@
-# family_task_app
+# Family Task App
 
-A new Flutter project.
+Flutter family task app using Firebase Authentication, Firestore, and FCM.
+
+## Push Notifications
+
+The app requests notification permission and stores each signed-in device token in
+`users/{uid}.fcmTokens`. The Cloud Function `notifyTodoAssignment` sends an FCM
+notification when a todo is created for someone other than its creator.
+
+From the project root, install and deploy the notification function:
+
+```powershell
+Set-Location functions
+npm install
+Set-Location ..
+firebase deploy --only functions
+```
+
+Enable the Cloud Functions API and Cloud Messaging API for the Firebase project
+before deploying. For web receivers, create a Web Push certificate key in
+Firebase Console > Project settings > Cloud Messaging, then run the app with:
+
+```powershell
+flutter run -d chrome --dart-define=FCM_WEB_VAPID_KEY=YOUR_PUBLIC_VAPID_KEY
+```
+
+The browser must grant notification permission. Android receivers need a device
+with Google Play services and notification permission enabled.
+
+For Android, add the Firebase Cloud Messaging API configuration in the Firebase
+project and test on a physical device or an emulator with Google Play services.
+For iOS, upload an APNs authentication key or certificate in Firebase Console
+and enable Push Notifications and Background Modes in the Runner target.
 
 ## Getting Started
 
