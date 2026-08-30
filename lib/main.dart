@@ -14,19 +14,68 @@ import 'firebase_options.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(const AppBootstrap());
+}
 
-  final notificationService = NotificationService();
-  await notificationService.initialize();
+class AppBootstrap extends StatefulWidget {
+  const AppBootstrap({super.key});
 
-  final authRepository = AuthRepository();
+  @override
+  State<AppBootstrap> createState() => _AppBootstrapState();
+}
 
-  runApp(
-    FamilyTaskApp(
-      authRepository: authRepository,
+class _AppBootstrapState extends State<AppBootstrap> {
+  late final Future<_AppDependencies> _dependencies = _initialize();
+
+  Future<_AppDependencies> _initialize() async {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    final notificationService = NotificationService();
+    await notificationService.initialize();
+    return _AppDependencies(
+      authRepository: AuthRepository(),
       notificationService: notificationService,
-    ),
-  );
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_AppDependencies>(
+      future: _dependencies,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              body: Center(child: Text('Error: ${snapshot.error}')),
+            ),
+          );
+        }
+        final dependencies = snapshot.data;
+        if (dependencies == null) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(body: Container()),
+          );
+        }
+        return FamilyTaskApp(
+          authRepository: dependencies.authRepository,
+          notificationService: dependencies.notificationService,
+        );
+      },
+    );
+  }
+}
+
+class _AppDependencies {
+  final AuthRepository authRepository;
+  final NotificationService notificationService;
+
+  const _AppDependencies({
+    required this.authRepository,
+    required this.notificationService,
+  });
 }
 
 class FamilyTaskApp extends StatelessWidget {
