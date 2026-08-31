@@ -13,6 +13,13 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AuthBloc, AuthState>(
+      buildWhen: (previous, current) {
+        // Do NOT rebuild AuthGate when loading or when an error occurs during login/signup.
+        // Only rebuild AuthGate when authentication status changes.
+        return current is AuthAuthenticated ||
+            current is AuthUnauthenticated ||
+            current is AuthInitial;
+      },
       builder: (context, state) {
         if (state is AuthInitial) {
           context.read<AuthBloc>().add(AuthCheckRequested());
@@ -22,16 +29,11 @@ class AuthGate extends StatelessWidget {
           );
         }
 
-        if (state is AuthLoading) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
         if (state is AuthAuthenticated) {
           return const DashboardPage();
         }
 
+        // Returns LoginPage for AuthUnauthenticated or AuthFailure states
         return const LoginPage();
       },
     );
