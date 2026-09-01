@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'features/family/data/repositories/family_repository.dart';
 import 'features/tasks/data/repositories/todo_repository.dart';
-import 'core/notifications/notification_service.dart';
 
 import 'features/authentication/data/repositories/auth_repository.dart';
 import 'features/authentication/presentation/bloc/auth_bloc.dart';
@@ -31,12 +30,7 @@ class _AppBootstrapState extends State<AppBootstrap> {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    final notificationService = NotificationService();
-    await notificationService.initialize();
-    return _AppDependencies(
-      authRepository: AuthRepository(),
-      notificationService: notificationService,
-    );
+    return _AppDependencies(authRepository: AuthRepository());
   }
 
   @override
@@ -59,10 +53,7 @@ class _AppBootstrapState extends State<AppBootstrap> {
             home: Scaffold(body: Container()),
           );
         }
-        return FamilyTaskApp(
-          authRepository: dependencies.authRepository,
-          notificationService: dependencies.notificationService,
-        );
+        return FamilyTaskApp(authRepository: dependencies.authRepository);
       },
     );
   }
@@ -70,23 +61,14 @@ class _AppBootstrapState extends State<AppBootstrap> {
 
 class _AppDependencies {
   final AuthRepository authRepository;
-  final NotificationService notificationService;
 
-  const _AppDependencies({
-    required this.authRepository,
-    required this.notificationService,
-  });
+  const _AppDependencies({required this.authRepository});
 }
 
 class FamilyTaskApp extends StatelessWidget {
   final AuthRepository authRepository;
-  final NotificationService notificationService;
 
-  const FamilyTaskApp({
-    super.key,
-    required this.authRepository,
-    required this.notificationService,
-  });
+  const FamilyTaskApp({super.key, required this.authRepository});
 
   @override
   Widget build(BuildContext context) {
@@ -98,10 +80,8 @@ class FamilyTaskApp extends StatelessWidget {
           RepositoryProvider(create: (_) => TodoRepository()),
         ],
         child: BlocProvider(
-          create: (context) => AuthBloc(
-            authRepository: context.read<AuthRepository>(),
-            notificationService: notificationService,
-          ),
+          create: (context) =>
+              AuthBloc(authRepository: context.read<AuthRepository>()),
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'Family Task App',

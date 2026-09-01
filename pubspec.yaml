@@ -36,8 +36,6 @@ dependencies:
   cupertino_icons: ^1.0.8
   firebase_core: ^4.13.0
   firebase_auth: ^6.6.1
-  firebase_messaging: ^16.6.0
-  flutter_local_notifications: ^19.4.2
   cloud_firestore: ^6.1.0
   google_sign_in: ^7.2.0
   sign_in_with_apple: ^7.0.1
