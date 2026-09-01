@@ -56,7 +56,7 @@ class TodoTile extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: canEdit
-              ? () => context.read<TodoCubit>().toggle(todo, !isDone)
+              ? () => context.read<TodoCubit>().toggle(todo.id, !isDone)
               : null,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -73,7 +73,7 @@ class TodoTile extends StatelessWidget {
                       ),
                       activeColor: theme.colorScheme.primary,
                       onChanged: (value) => context.read<TodoCubit>().toggle(
-                        todo,
+                        todo.id,
                         value ?? false,
                       ),
                     ),
@@ -101,7 +101,9 @@ class TodoTile extends StatelessWidget {
                               ? TextDecoration.lineThrough
                               : null,
                           color: isDone
-                              ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)
+                              ? theme.colorScheme.onSurfaceVariant.withValues(
+                                  alpha: 0.6,
+                                )
                               : theme.colorScheme.onSurface,
                         ),
                       ),

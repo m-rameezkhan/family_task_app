@@ -361,6 +361,7 @@ class _FamilySetupState extends State<FamilySetup> {
                               ? null
                               : () => context.read<FamilyCubit>().join(
                                   _codeController.text,
+                                  widget.userName,
                                 ),
                           style: FilledButton.styleFrom(
                             shape: RoundedRectangleBorder(

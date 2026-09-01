@@ -61,7 +61,11 @@ class _TodoDialogState extends State<_TodoDialog> {
     final title = _controller.text.trim();
     if (title.isEmpty || _saving) return;
     setState(() => _saving = true);
-    await widget.todoCubit.add(title, _deadline, widget.createdBy);
+    await widget.todoCubit.add(
+      title,
+      deadline: _deadline,
+      assignedTo: widget.assignedTo,
+    );
     if (mounted) Navigator.pop(context);
   }
 

@@ -8,59 +8,157 @@ class TodoRepository {
   TodoRepository({FirebaseFirestore? firestore})
     : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  CollectionReference<Map<String, dynamic>> get _todos =>
-      _firestore.collection('todos');
+  CollectionReference<Map<String, dynamic>> _todosCollection(String familyId) {
+    return _firestore.collection('families').doc(familyId).collection('todos');
+  }
 
+  /// Watch todos assigned to or visible to a user
+  /// Shows personal tasks (familyId empty) and family tasks
   Stream<List<Todo>> watchTodos({String? familyId, required String userId}) {
-    Query<Map<String, dynamic>> query = _todos.where(
-      'assignedTo',
-      isEqualTo: userId,
-    );
-    if (familyId != null) {
-      query = query.where('familyId', whereIn: ['', familyId]);
+    if (familyId == null || familyId.isEmpty) {
+      return Stream.value([]);
     }
-    return query.snapshots().map((snapshot) {
-      final todos = snapshot.docs.map(Todo.fromDocument).toList();
+
+    return _todosCollection(familyId).snapshots().map((snapshot) {
+      final todos = snapshot.docs.map(Todo.fromDocument).where((todo) {
+        // User can see:
+        // 1. Tasks assigned to them
+        // 2. Tasks assigned to all members (empty assignedTo)
+        // 3. Tasks they created
+        return todo.assignedTo.isEmpty ||
+            todo.assignedTo == userId ||
+            todo.createdBy == userId;
+      }).toList();
       todos.sort(
         (a, b) =>
-            (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)),
+            (b.deadline ?? DateTime(0)).compareTo(a.deadline ?? DateTime(0)),
       );
       return todos;
     });
   }
 
-  Stream<List<Todo>> watchMemberTodos(String familyId, String userId) {
-    return watchTodos(familyId: familyId, userId: userId);
+  /// Watch all todos in a family (for admin/dashboard)
+  Stream<List<Todo>> watchFamilyTodos(String familyId) {
+    return _todosCollection(familyId).snapshots().map((snapshot) {
+      final todos = snapshot.docs.map(Todo.fromDocument).toList();
+      todos.sort(
+        (a, b) =>
+            (b.deadline ?? DateTime(0)).compareTo(a.deadline ?? DateTime(0)),
+      );
+      return todos;
+    });
   }
 
-  Future<void> addTodo({
-    String? familyId,
-    required String assignedTo,
+  /// Watch todos assigned to a specific member
+  Stream<List<Todo>> watchMemberTodos(String familyId, String userId) {
+    return _todosCollection(
+      familyId,
+    ).where('assignedTo', whereIn: ['', userId]).snapshots().map((snapshot) {
+      final todos = snapshot.docs.map(Todo.fromDocument).toList();
+      todos.sort(
+        (a, b) =>
+            (b.deadline ?? DateTime(0)).compareTo(a.deadline ?? DateTime(0)),
+      );
+      return todos;
+    });
+  }
+
+  /// Create a new task
+  Future<String> addTodo({
+    required String familyId,
+    required String assignedTo, // Empty string = all/unassigned
     required String createdBy,
     required String title,
+    String description = '',
     DateTime? deadline,
+    bool requiresVerification = false,
+    int priority = 1,
+    List<String> tags = const [],
+    double? estimatedHours,
   }) async {
-    final document = _todos.doc();
-    final now = FieldValue.serverTimestamp();
-    await document.set({
-      'todoId': document.id,
-      'familyId': familyId ?? '',
+    final docRef = _todosCollection(familyId).doc();
+    final now = DateTime.now();
+
+    await docRef.set({
+      'todoId': docRef.id,
+      'familyId': familyId,
       'assignedTo': assignedTo,
       'createdBy': createdBy,
       'title': title.trim(),
-      'deadline': deadline == null ? null : Timestamp.fromDate(deadline),
+      'description': description.trim(),
+      'deadline': deadline != null ? Timestamp.fromDate(deadline) : null,
       'status': false,
-      'createdAt': now,
-      'updatedAt': now,
+      'requiresVerification': requiresVerification,
+      'verifiedBy': [],
+      'priority': priority,
+      'tags': tags,
+      'estimatedHours': estimatedHours,
+      'createdAt': Timestamp.fromDate(now),
+      'updatedAt': Timestamp.fromDate(now),
       'completedAt': null,
+    });
+
+    return docRef.id;
+  }
+
+  /// Update an existing task
+  Future<void> updateTodo(String familyId, Todo todo) async {
+    await _todosCollection(familyId)
+        .doc(todo.id)
+        .update(todo.toDocument()..['updatedAt'] = Timestamp.now());
+  }
+
+  /// Delete a task
+  Future<void> deleteTodo(String familyId, String todoId) async {
+    await _todosCollection(familyId).doc(todoId).delete();
+  }
+
+  /// Toggle task status (complete/incomplete)
+  Future<void> setStatus(String familyId, String todoId, bool completed) async {
+    await _todosCollection(familyId).doc(todoId).update({
+      'status': completed,
+      'updatedAt': Timestamp.now(),
+      'completedAt': completed ? Timestamp.now() : null,
     });
   }
 
-  Future<void> setStatus(Todo todo, bool completed) {
-    return _todos.doc(todo.id).update({
-      'status': completed,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'completedAt': completed ? FieldValue.serverTimestamp() : null,
-    });
+  /// Mark task as verified by a user
+  Future<void> verifyTask(String familyId, String todoId, String userId) async {
+    final doc = await _todosCollection(familyId).doc(todoId).get();
+    if (doc.exists) {
+      final verifiedBy = List<String>.from(
+        doc.data()?['verifiedBy'] as List? ?? [],
+      );
+      if (!verifiedBy.contains(userId)) {
+        verifiedBy.add(userId);
+        await _todosCollection(familyId)
+            .doc(todoId)
+            .update({'verifiedBy': verifiedBy, 'updatedAt': Timestamp.now()});
+      }
+    }
+  }
+
+  /// Unverify task
+  Future<void> unverifyTask(
+    String familyId,
+    String todoId,
+    String userId,
+  ) async {
+    final doc = await _todosCollection(familyId).doc(todoId).get();
+    if (doc.exists) {
+      final verifiedBy = List<String>.from(
+        doc.data()?['verifiedBy'] as List? ?? [],
+      );
+      verifiedBy.remove(userId);
+      await _todosCollection(familyId)
+          .doc(todoId)
+          .update({'verifiedBy': verifiedBy, 'updatedAt': Timestamp.now()});
+    }
+  }
+
+  /// Get task by ID
+  Future<Todo?> getTodo(String familyId, String todoId) async {
+    final doc = await _todosCollection(familyId).doc(todoId).get();
+    return doc.exists ? Todo.fromDocument(doc) : null;
   }
 }

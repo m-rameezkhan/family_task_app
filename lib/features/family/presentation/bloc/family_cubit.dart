@@ -87,10 +87,14 @@ class FamilyCubit extends Cubit<FamilyState> {
     }
   }
 
-  Future<void> join(String code) async {
+  Future<void> join(String code, String userName) async {
     emit(state.copyWith(loading: true, error: null));
     try {
-      await _repository.joinFamily(userId: userId, code: code);
+      await _repository.joinFamily(
+        userId: userId,
+        code: code,
+        userName: userName,
+      );
       await load();
     } catch (error) {
       emit(FamilyState(error: error.toString(), loading: false));

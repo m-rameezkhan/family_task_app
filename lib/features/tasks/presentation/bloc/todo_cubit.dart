@@ -37,24 +37,39 @@ class TodoCubit extends Cubit<TodoState> {
         );
   }
 
-  Future<void> add(String title, DateTime? deadline, String createdBy) async {
-    if (title.trim().isEmpty) return;
+  Future<void> add(
+    String title, {
+    String description = '',
+    DateTime? deadline,
+    String? assignedTo,
+    bool requiresVerification = false,
+    int priority = 1,
+    List<String> tags = const [],
+    double? estimatedHours,
+  }) async {
+    if (title.trim().isEmpty || familyId == null || familyId!.isEmpty) return;
     try {
       await _repository.addTodo(
-        familyId: familyId,
-        assignedTo: userId,
-        createdBy: createdBy,
+        familyId: familyId!,
+        assignedTo: assignedTo ?? userId, // Default to current user
+        createdBy: userId,
         title: title,
+        description: description,
         deadline: deadline,
+        requiresVerification: requiresVerification,
+        priority: priority,
+        tags: tags,
+        estimatedHours: estimatedHours,
       );
     } catch (error) {
       emit(state.copyWith(error: error.toString()));
     }
   }
 
-  Future<void> toggle(Todo todo, bool completed) async {
+  Future<void> toggle(String todoId, bool completed) async {
+    if (familyId == null || familyId!.isEmpty) return;
     try {
-      await _repository.setStatus(todo, completed);
+      await _repository.setStatus(familyId!, todoId, completed);
     } catch (error) {
       emit(state.copyWith(error: error.toString()));
     }

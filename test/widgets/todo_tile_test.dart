@@ -16,8 +16,14 @@ void main() {
     assignedTo: 'user-1',
     createdBy: 'user-2',
     title: 'Take out trash',
+    description: '',
     deadline: null,
     status: false,
+    requiresVerification: false,
+    verifiedBy: [],
+    priority: 1,
+    tags: [],
+    estimatedHours: null,
     createdAt: null,
     updatedAt: null,
     completedAt: null,
@@ -26,7 +32,7 @@ void main() {
   testWidgets('assigned user can mark a todo complete', (tester) async {
     final cubit = MockTodoCubit();
     when(() => cubit.stream).thenAnswer((_) => Stream<TodoState>.empty());
-    when(() => cubit.toggle(todo, true)).thenAnswer((_) async {});
+    when(() => cubit.toggle('todo-1', true)).thenAnswer((_) async {});
 
     await tester.pumpWidget(
       MaterialApp(
@@ -38,7 +44,7 @@ void main() {
     );
 
     await tester.tap(find.byType(Checkbox));
-    verify(() => cubit.toggle(todo, true)).called(1);
+    verify(() => cubit.toggle('todo-1', true)).called(1);
   });
 
   testWidgets('other family members see a todo without a checkbox', (
