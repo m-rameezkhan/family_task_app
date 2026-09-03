@@ -38,7 +38,9 @@ void main() {
       MaterialApp(
         home: BlocProvider<TodoCubit>.value(
           value: cubit,
-          child: const Scaffold(body: TodoTile(todo: todo, canEdit: true)),
+          child: const Scaffold(
+            body: TodoTile(todo: todo, canEdit: true, userId: 'user-1'),
+          ),
         ),
       ),
     );
@@ -52,7 +54,9 @@ void main() {
   ) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(body: TodoTile(todo: todo, canEdit: false)),
+        home: Scaffold(
+          body: TodoTile(todo: todo, canEdit: false, userId: 'user-1'),
+        ),
       ),
     );
 

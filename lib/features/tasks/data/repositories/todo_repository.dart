@@ -12,8 +12,8 @@ class TodoRepository {
     return _firestore.collection('families').doc(familyId).collection('todos');
   }
 
-  /// Watch todos assigned to or visible to a user
-  /// Shows personal tasks (familyId empty) and family tasks
+  /// Watch todos assigned to or visible to a user.
+  /// Empty assignedTo means unassigned, visible only to its creator.
   Stream<List<Todo>> watchTodos({String? familyId, required String userId}) {
     if (familyId == null || familyId.isEmpty) {
       return Stream.value([]);
@@ -21,13 +21,10 @@ class TodoRepository {
 
     return _todosCollection(familyId).snapshots().map((snapshot) {
       final todos = snapshot.docs.map(Todo.fromDocument).where((todo) {
-        // User can see:
-        // 1. Tasks assigned to them
-        // 2. Tasks assigned to all members (empty assignedTo)
-        // 3. Tasks they created
-        return todo.assignedTo.isEmpty ||
-            todo.assignedTo == userId ||
-            todo.createdBy == userId;
+        // Assigned tasks show only for the assignee.
+        // Unassigned tasks stay visible to the creator.
+        return todo.assignedTo == userId ||
+            (todo.assignedTo.isEmpty && todo.createdBy == userId);
       }).toList();
       todos.sort(
         (a, b) =>
@@ -53,7 +50,7 @@ class TodoRepository {
   Stream<List<Todo>> watchMemberTodos(String familyId, String userId) {
     return _todosCollection(
       familyId,
-    ).where('assignedTo', whereIn: ['', userId]).snapshots().map((snapshot) {
+    ).where('assignedTo', isEqualTo: userId).snapshots().map((snapshot) {
       final todos = snapshot.docs.map(Todo.fromDocument).toList();
       todos.sort(
         (a, b) =>
@@ -66,7 +63,7 @@ class TodoRepository {
   /// Create a new task
   Future<String> addTodo({
     required String familyId,
-    required String assignedTo, // Empty string = all/unassigned
+    required String assignedTo, // Empty string = unassigned
     required String createdBy,
     required String title,
     String description = '',

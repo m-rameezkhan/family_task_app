@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -8,7 +10,9 @@ import 'auth_state.dart';
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _authRepository;
 
-  AuthBloc({required this._authRepository}) : super(AuthInitial()) {
+  AuthBloc({required AuthRepository authRepository})
+    : _authRepository = authRepository,
+      super(AuthInitial()) {
     on<AuthCheckRequested>(_onAuthCheckRequested);
     on<AuthLoginRequested>(_onLoginRequested);
     on<AuthSignupRequested>(_onSignupRequested);
@@ -24,7 +28,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final user = _authRepository.currentUser;
 
     if (user != null) {
-      emit(AuthAuthenticated(user));
+      final userName = await _authRepository.getUserName(user.uid);
+
+      emit(AuthAuthenticated(user, userName));
     } else {
       emit(AuthUnauthenticated());
     }
@@ -41,7 +47,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         email: event.email,
         password: event.password,
       );
-      emit(AuthAuthenticated(result.user!));
+
+      final user = result.user!;
+
+      final userName = await _authRepository.getUserName(user.uid);
+
+      emit(AuthAuthenticated(user, userName));
     } on FirebaseAuthException catch (e) {
       emit(AuthFailure(e.message ?? 'Login failed.'));
     } catch (_) {
@@ -61,7 +72,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         email: event.email,
         password: event.password,
       );
-      emit(AuthAuthenticated(result.user!));
+
+      final user = result.user!;
+
+      final userName = await _authRepository.getUserName(user.uid);
+
+      emit(AuthAuthenticated(user, userName));
     } on FirebaseAuthException catch (e) {
       emit(AuthFailure(e.message ?? 'Signup failed.'));
     } catch (_) {
@@ -106,9 +122,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     String fallback,
   ) async {
     emit(AuthLoading());
+
     try {
       final result = await login();
-      emit(AuthAuthenticated(result.user!));
+
+      final user = result.user!;
+
+      final userName = await _authRepository.getUserName(user.uid);
+
+      emit(AuthAuthenticated(user, userName));
     } on FirebaseAuthException catch (error) {
       emit(AuthFailure(error.message ?? fallback));
     } catch (_) {

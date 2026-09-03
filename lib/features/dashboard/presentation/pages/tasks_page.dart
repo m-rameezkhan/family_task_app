@@ -5,8 +5,8 @@ import '../../../family/presentation/bloc/family_cubit.dart';
 // import '../../../tasks/data/models/todo.dart';
 import '../../../tasks/data/repositories/todo_repository.dart';
 import '../../../tasks/presentation/bloc/todo_cubit.dart';
+import '../../../tasks/presentation/pages/task_create_edit_page.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/todo_dialog.dart';
 import '../widgets/todo_tile.dart';
 
 class TasksPage extends StatelessWidget {
@@ -29,7 +29,7 @@ class TasksPage extends StatelessWidget {
             familyId: familyState.family?.id,
             userId: userId,
           ),
-          child: _TaskListView(userName: userName),
+          child: _TaskListView(userName: userName, userId: userId),
         );
       },
     );
@@ -38,12 +38,14 @@ class TasksPage extends StatelessWidget {
 
 class _TaskListView extends StatelessWidget {
   final String userName;
+  final String userId;
 
-  const _TaskListView({required this.userName});
+  const _TaskListView({required this.userName, required this.userId});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final userId = this.userId;
 
     return BlocBuilder<TodoCubit, TodoState>(
       builder: (context, state) {
@@ -53,6 +55,10 @@ class _TaskListView extends StatelessWidget {
 
         final pendingTasks = state.todos.where((t) => !t.status).toList();
         final completedTasks = state.todos.where((t) => t.status).toList();
+        final memberNames = {
+          for (final member in context.read<FamilyCubit>().state.members)
+            member.id: member.name,
+        };
 
         return Scaffold(
           backgroundColor: theme.colorScheme.surfaceContainerLowest,
@@ -100,10 +106,12 @@ class _TaskListView extends StatelessWidget {
                             return TodoTile(
                               todo: todo,
                               canEdit: true,
+                              userId: userId,
                               creatorName: _creatorName(
                                 context,
                                 todo.createdBy,
                               ),
+                              memberNames: memberNames,
                             );
                           }, childCount: pendingTasks.length),
                         ),
@@ -135,10 +143,12 @@ class _TaskListView extends StatelessWidget {
                             return TodoTile(
                               todo: todo,
                               canEdit: true,
+                              userId: userId,
                               creatorName: _creatorName(
                                 context,
                                 todo.createdBy,
                               ),
+                              memberNames: memberNames,
                             );
                           }, childCount: completedTasks.length),
                         ),
@@ -149,7 +159,28 @@ class _TaskListView extends StatelessWidget {
                   ],
                 ),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => showTodoDialog(context),
+            onPressed: () {
+              final familyCubit = context.read<FamilyCubit>();
+              final todoCubit = context.read<TodoCubit>();
+              final familyId = familyCubit.state.family?.id;
+              if (familyId != null && familyId.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MultiBlocProvider(
+                      providers: [
+                        BlocProvider.value(value: familyCubit),
+                        BlocProvider.value(value: todoCubit),
+                      ],
+                      child: TaskCreateEditPage(
+                        familyId: familyId,
+                        userId: this.userId,
+                      ),
+                    ),
+                  ),
+                );
+              }
+            },
             icon: const Icon(Icons.add_rounded),
             label: const Text('Add Task'),
             elevation: 3,

@@ -69,7 +69,7 @@ void main() {
     when(
       () => repository.addTodo(
         familyId: familyId,
-        assignedTo: 'user-1',
+        assignedTo: '',
         createdBy: 'user-1',
         title: '  Wash dishes  ',
         description: '',
@@ -91,7 +91,7 @@ void main() {
     verify(
       () => repository.addTodo(
         familyId: familyId,
-        assignedTo: 'user-1',
+        assignedTo: '',
         createdBy: 'user-1',
         title: '  Wash dishes  ',
         description: '',

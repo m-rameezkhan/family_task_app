@@ -54,6 +54,11 @@ class MemberTodosPage extends StatelessWidget {
                                 (todo) => TodoTile(
                                   todo: todo,
                                   canEdit: false,
+                                  userId: member.id,
+                                  memberNames: {
+                                    for (final member in familyState.members)
+                                      member.id: member.name,
+                                  },
                                   creatorName: familyState.members
                                       .where(
                                         (member) => member.id == todo.createdBy,

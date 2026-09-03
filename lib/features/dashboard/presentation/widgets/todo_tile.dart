@@ -3,17 +3,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../tasks/data/models/todo.dart';
 import '../../../tasks/presentation/bloc/todo_cubit.dart';
+import '../../../tasks/presentation/pages/task_detail_page.dart';
+import '../../../../core/utils/date_formatter.dart';
 
 class TodoTile extends StatelessWidget {
   final Todo todo;
   final bool canEdit;
   final String? creatorName;
+  final Map<String, String> memberNames;
+  final String userId;
 
   const TodoTile({
     super.key,
     required this.todo,
     required this.canEdit,
+    required this.userId,
     this.creatorName,
+    this.memberNames = const {},
   });
 
   @override
@@ -55,9 +61,23 @@ class TodoTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: canEdit
-              ? () => context.read<TodoCubit>().toggle(todo.id, !isDone)
-              : null,
+          onTap: () {
+            final todoCubit = context.read<TodoCubit>();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BlocProvider.value(
+                  value: todoCubit,
+                  child: TaskDetailPage(
+                    todo: todo,
+                    userId: userId,
+                    canEdit: canEdit,
+                    memberNames: memberNames,
+                  ),
+                ),
+              ),
+            );
+          },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
@@ -146,19 +166,36 @@ class TodoTile extends StatelessWidget {
                                         : theme.colorScheme.onSurfaceVariant,
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    'Due ${_date(todo.deadline!)}',
-                                    style: theme.textTheme.labelMedium
-                                        ?.copyWith(
-                                          fontWeight: isOverdue
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
-                                          color: isOverdue
-                                              ? theme.colorScheme.error
-                                              : theme
-                                                    .colorScheme
-                                                    .onSurfaceVariant,
-                                        ),
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        formatDeadlineWithTime(todo.deadline),
+                                        style: theme.textTheme.labelMedium
+                                            ?.copyWith(
+                                              fontWeight: isOverdue
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                              color: isOverdue
+                                                  ? theme.colorScheme.error
+                                                  : theme
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                            ),
+                                      ),
+                                      Text(
+                                        formatTimeRemaining(todo.deadline),
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                              color: isOverdue
+                                                  ? theme.colorScheme.error
+                                                  : theme
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -176,5 +213,3 @@ class TodoTile extends StatelessWidget {
     );
   }
 }
-
-String _date(DateTime value) => '${value.day}/${value.month}/${value.year}';

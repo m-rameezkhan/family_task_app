@@ -91,17 +91,18 @@ class AuthRepository {
 
     String? googleName;
 
-    final profile = result.additionalUserInfo?.profile;
+    if (providerName == 'google') {
+      final profile = result.additionalUserInfo?.profile;
 
-    if (profile != null) {
-      googleName = profile['name'] as String?;
+      if (profile != null) {
+        googleName = profile['name'] as String?;
+      }
     }
 
     await _saveUserProfile(user, provider: providerName, name: googleName);
 
     return result;
   }
-
   // =========================
   // Save / Update User Profile
   // =========================
@@ -206,6 +207,27 @@ class AuthRepository {
     final localPart = email?.split('@').first.trim() ?? '';
 
     return localPart.isEmpty ? 'Family member' : localPart;
+  }
+
+  // =========================
+  // Get  User Name
+  // =========================
+
+  Future<String> getUserName(String uid) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+
+    final data = snapshot.data();
+
+    final name = data?['name'] as String?;
+
+    if (name != null && name.trim().isNotEmpty) {
+      return name.trim();
+    }
+
+    return 'Family member';
   }
 
   // =========================

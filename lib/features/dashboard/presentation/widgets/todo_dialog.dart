@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/utils/date_formatter.dart';
 import '../../../tasks/presentation/bloc/todo_cubit.dart';
 
 Future<void> showTodoDialog(BuildContext context) async {
@@ -90,7 +91,7 @@ class _TodoDialogState extends State<_TodoDialog> {
                 child: Text(
                   _deadline == null
                       ? 'No deadline'
-                      : 'Due ${_date(_deadline!)}',
+                      : 'Due ${formatDeadlineDate(_deadline)} at ${formatTime(_deadline)}',
                 ),
               ),
               IconButton(
@@ -102,11 +103,25 @@ class _TodoDialogState extends State<_TodoDialog> {
                           context: context,
                           firstDate: DateTime.now(),
                           lastDate: DateTime(2100),
-                          initialDate: DateTime.now(),
+                          initialDate: _deadline ?? DateTime.now(),
                         );
-                        if (picked != null && mounted) {
-                          setState(() => _deadline = picked);
-                        }
+                        if (picked == null || !context.mounted) return;
+                        final pickedTime = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(
+                            _deadline ?? DateTime.now(),
+                          ),
+                        );
+                        if (pickedTime == null || !context.mounted) return;
+                        setState(
+                          () => _deadline = DateTime(
+                            picked.year,
+                            picked.month,
+                            picked.day,
+                            pickedTime.hour,
+                            pickedTime.minute,
+                          ),
+                        );
                       },
                 icon: const Icon(Icons.event),
               ),
@@ -133,5 +148,3 @@ class _TodoDialogState extends State<_TodoDialog> {
     );
   }
 }
-
-String _date(DateTime value) => '${value.day}/${value.month}/${value.year}';

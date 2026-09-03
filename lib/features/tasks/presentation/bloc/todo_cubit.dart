@@ -51,7 +51,7 @@ class TodoCubit extends Cubit<TodoState> {
     try {
       await _repository.addTodo(
         familyId: familyId!,
-        assignedTo: assignedTo ?? userId, // Default to current user
+        assignedTo: assignedTo ?? '',
         createdBy: userId,
         title: title,
         description: description,
@@ -70,6 +70,42 @@ class TodoCubit extends Cubit<TodoState> {
     if (familyId == null || familyId!.isEmpty) return;
     try {
       await _repository.setStatus(familyId!, todoId, completed);
+    } catch (error) {
+      emit(state.copyWith(error: error.toString()));
+    }
+  }
+
+  Future<void> updateTodo(Todo todo) async {
+    if (familyId == null || familyId!.isEmpty) return;
+    try {
+      await _repository.updateTodo(familyId!, todo);
+    } catch (error) {
+      emit(state.copyWith(error: error.toString()));
+    }
+  }
+
+  Future<void> deleteTodo(String todoId) async {
+    if (familyId == null || familyId!.isEmpty) return;
+    try {
+      await _repository.deleteTodo(familyId!, todoId);
+    } catch (error) {
+      emit(state.copyWith(error: error.toString()));
+    }
+  }
+
+  Future<void> verifyTask(String todoId, String userId) async {
+    if (familyId == null || familyId!.isEmpty) return;
+    try {
+      await _repository.verifyTask(familyId!, todoId, userId);
+    } catch (error) {
+      emit(state.copyWith(error: error.toString()));
+    }
+  }
+
+  Future<void> unverifyTask(String todoId, String userId) async {
+    if (familyId == null || familyId!.isEmpty) return;
+    try {
+      await _repository.unverifyTask(familyId!, todoId, userId);
     } catch (error) {
       emit(state.copyWith(error: error.toString()));
     }

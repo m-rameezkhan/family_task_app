@@ -15,15 +15,13 @@ class DashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
-    if (authState is! AuthAuthenticated) return const SizedBox.shrink();
-    final user = authState.user;
 
-    final fallbackName =
-        (user.displayName != null && user.displayName!.trim().isNotEmpty)
-        ? user.displayName!
-        : (user.email != null && user.email!.contains('@'))
-        ? user.email!.split('@').first
-        : 'Member';
+    if (authState is! AuthAuthenticated) {
+      return const SizedBox.shrink();
+    }
+
+    final user = authState.user;
+    final userName = authState.userName;
 
     return BlocProvider(
       create: (_) => FamilyCubit(
@@ -32,7 +30,7 @@ class DashboardPage extends StatelessWidget {
       ),
       child: _DashboardView(
         userId: user.uid,
-        fallbackName: fallbackName,
+        fallbackName: userName,
         userPhotoUrl: user.photoURL,
       ),
     );
@@ -77,11 +75,16 @@ class _DashboardViewState extends State<_DashboardView> {
       },
       child: BlocBuilder<FamilyCubit, FamilyState>(
         builder: (context, familyState) {
-          // Fetch exact user name from state.members (FamilyPage logic)
+          // Prefer the exact name stored in the family member record.
           final currentMember = familyState.members
               .where((m) => m.id == widget.userId)
               .firstOrNull;
 
+          // If the user belongs to a family:
+          //     Family member name
+          //
+          // Otherwise:
+          //     Firestore users/{uid}.name
           final userName = currentMember?.name ?? widget.fallbackName;
 
           return Scaffold(
@@ -89,10 +92,8 @@ class _DashboardViewState extends State<_DashboardView> {
             body: SafeArea(
               child: Column(
                 children: [
-                  // Header using resolved userName
                   _buildHeader(theme, userName, familyState),
 
-                  // Active Tab Content
                   Expanded(
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 250),
@@ -113,7 +114,6 @@ class _DashboardViewState extends State<_DashboardView> {
               ),
             ),
 
-            // Clean Standard Navigation Bar
             bottomNavigationBar: Container(
               decoration: BoxDecoration(
                 border: Border(
@@ -128,7 +128,9 @@ class _DashboardViewState extends State<_DashboardView> {
                 elevation: 0,
                 height: 65,
                 selectedIndex: _tab,
-                onDestinationSelected: (index) => setState(() => _tab = index),
+                onDestinationSelected: (index) {
+                  setState(() => _tab = index);
+                },
                 indicatorColor: theme.colorScheme.primaryContainer,
                 destinations: const [
                   NavigationDestination(

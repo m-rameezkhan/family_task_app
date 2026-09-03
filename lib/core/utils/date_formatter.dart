@@ -59,6 +59,13 @@ String formatTimeRemaining(DateTime? deadline) {
   }
 }
 
+/// Format a deadline with both relative date and readable clock time.
+/// Returns: "Today at 2 PM", "Sunday at 4:30 PM", "15 Sep 2026 at 9 AM".
+String formatDeadlineWithTime(DateTime? deadline) {
+  if (deadline == null) return 'No deadline';
+  return '${formatDeadlineDate(deadline)} at ${formatTime(deadline)}';
+}
+
 /// Format date as "15 Sep 2026"
 String _formatDate(DateTime date) {
   final months = [
@@ -92,12 +99,15 @@ String _getDayName(DateTime date) {
   return days[date.weekday - 1];
 }
 
-/// Format time as "2:30 PM" or "14:30" (depending on locale)
+/// Format time as "2 PM" or "2:30 PM".
 String formatTime(DateTime? time) {
   if (time == null) return '';
-  final hour = time.hour.toString().padLeft(2, '0');
-  final minute = time.minute.toString().padLeft(2, '0');
-  return '$hour:$minute';
+  final period = time.hour >= 12 ? 'PM' : 'AM';
+  final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+  final minute = time.minute == 0
+      ? ''
+      : ':${time.minute.toString().padLeft(2, '0')}';
+  return '$hour$minute $period';
 }
 
 /// Check if deadline is today

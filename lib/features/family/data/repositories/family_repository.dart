@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -39,6 +40,7 @@ class FamilyRepository {
 
     // Add user as head member
     batch.set(_families.doc(familyId).collection('members').doc(userId), {
+      'id': userId,
       'fullName': userName,
       'nickname': '',
       'email': '',
@@ -82,6 +84,7 @@ class FamilyRepository {
 
     // Add user as member
     batch.set(_families.doc(family.id).collection('members').doc(userId), {
+      'id': userId,
       'fullName': userName,
       'nickname': '',
       'email': '',
@@ -114,13 +117,56 @@ class FamilyRepository {
 
   /// Watch family members
   Stream<List<FamilyMember>> watchMembers(String familyId) {
-    return _families
-        .doc(familyId)
-        .collection('members')
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs.map(FamilyMember.fromDocument).toList(),
-        );
+    late StreamController<List<FamilyMember>> controller;
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? memberSub;
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? userSub;
+    List<FamilyMember> memberDocs = const [];
+    List<FamilyMember> userDocs = const [];
+
+    void emitMembers() {
+      final merged = <String, FamilyMember>{
+        for (final member in userDocs) member.id: member,
+        for (final member in memberDocs) member.id: member,
+      }.values.toList();
+
+      merged.sort((a, b) {
+        if (a.isHead != b.isHead) return a.isHead ? -1 : 1;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+      controller.add(merged);
+    }
+
+    controller = StreamController<List<FamilyMember>>.broadcast(
+      onListen: () {
+        memberSub = _families
+            .doc(familyId)
+            .collection('members')
+            .snapshots()
+            .listen((snapshot) {
+              memberDocs = snapshot.docs
+                  .map(FamilyMember.fromDocument)
+                  .toList();
+              emitMembers();
+            }, onError: controller.addError);
+
+        userSub = _firestore
+            .collection('users')
+            .where('familyId', isEqualTo: familyId)
+            .snapshots()
+            .listen((snapshot) {
+              userDocs = snapshot.docs
+                  .map(FamilyMember.fromUserDocument)
+                  .toList();
+              emitMembers();
+            }, onError: controller.addError);
+      },
+      onCancel: () async {
+        await memberSub?.cancel();
+        await userSub?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   /// Get a specific member

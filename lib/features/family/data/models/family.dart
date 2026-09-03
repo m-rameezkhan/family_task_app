@@ -94,7 +94,7 @@ class FamilyMember {
     final data = document.data() ?? {};
     DateTime? date(String key) => (data[key] as Timestamp?)?.toDate();
     return FamilyMember(
-      id: document.id,
+      id: data['id'] as String? ?? data['uid'] as String? ?? document.id,
       name: (data['fullName'] as String?)?.trim().isNotEmpty == true
           ? (data['fullName'] as String).trim()
           : (data['name'] as String?)?.trim().isNotEmpty == true
@@ -106,6 +106,22 @@ class FamilyMember {
       dateOfBirth: date('dateOfBirth'),
       joinedAt: date('joinedAt'),
       isHead: data['isHead'] as bool? ?? false,
+    );
+  }
+
+  factory FamilyMember.fromUserDocument(
+    DocumentSnapshot<Map<String, dynamic>> document,
+  ) {
+    final data = document.data() ?? {};
+    DateTime? date(String key) => (data[key] as Timestamp?)?.toDate();
+    return FamilyMember(
+      id: data['uid'] as String? ?? document.id,
+      name: (data['name'] as String?)?.trim().isNotEmpty == true
+          ? (data['name'] as String).trim()
+          : _nameFromEmail(data['email'] as String?),
+      email: data['email'] as String? ?? '',
+      photoUrl: data['photoUrl'] as String?,
+      joinedAt: date('createdAt'),
     );
   }
 
@@ -140,6 +156,7 @@ class FamilyMember {
   // Convert to Firestore document
   Map<String, dynamic> toDocument() {
     return {
+      'id': id,
       'fullName': name,
       'nickname': nickname,
       'email': email,

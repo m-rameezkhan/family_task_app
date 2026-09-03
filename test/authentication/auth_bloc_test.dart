@@ -24,6 +24,8 @@ void main() {
     user = MockUser();
     when(() => credential.user).thenReturn(user);
     when(() => user.uid).thenReturn('user-123');
+    when(() => repository.getUserName('user-123'))
+        .thenAnswer((_) async => 'Test User');
   });
 
   test('login emits loading then authenticated', () async {
