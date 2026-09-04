@@ -3,43 +3,37 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/utils/date_formatter.dart';
 import '../../../family/presentation/bloc/family_cubit.dart';
-import '../../data/models/todo.dart';
 import '../bloc/todo_cubit.dart';
 
-class TaskCreateEditPage extends StatefulWidget {
-  final Todo? todo;
+class TaskCreatePage extends StatefulWidget {
   final String familyId;
   final String userId;
 
-  const TaskCreateEditPage({
+  const TaskCreatePage({
     super.key,
-    this.todo,
     required this.familyId,
     required this.userId,
   });
 
   @override
-  State<TaskCreateEditPage> createState() => _TaskCreateEditPageState();
+  State<TaskCreatePage> createState() => _TaskCreatePageState();
 }
 
-class _TaskCreateEditPageState extends State<TaskCreateEditPage> {
+class _TaskCreatePageState extends State<TaskCreatePage> {
   late final TextEditingController _titleController;
 
   DateTime? _deadline;
-  String _assignedTo = '';
+
+  /// null = assign to no one / open task
+  String? _assignedTo;
+
   bool _requiresVerification = false;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.todo?.title ?? '');
-
-    if (widget.todo != null) {
-      _deadline = widget.todo!.deadline;
-      _assignedTo = widget.todo!.assignedTo;
-      _requiresVerification = widget.todo!.requiresVerification;
-    }
+    _titleController = TextEditingController();
   }
 
   @override
@@ -50,6 +44,7 @@ class _TaskCreateEditPageState extends State<TaskCreateEditPage> {
 
   Future<void> _saveTask() async {
     final title = _titleController.text.trim();
+
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a task title')),
@@ -57,82 +52,83 @@ class _TaskCreateEditPageState extends State<TaskCreateEditPage> {
       return;
     }
 
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+    });
 
     try {
-      if (widget.todo == null) {
-        await context.read<TodoCubit>().add(
-          title,
-          deadline: _deadline,
-          assignedTo: _assignedTo,
-          requiresVerification: _requiresVerification,
-        );
-      } else {
-        final updated = widget.todo!.copyWith(
-          title: title,
-          deadline: _deadline,
-          clearDeadline: _deadline == null,
-          assignedTo: _assignedTo,
-          requiresVerification: _requiresVerification,
-          updatedAt: DateTime.now(),
-        );
-        await context.read<TodoCubit>().updateTodo(updated);
+      await context.read<TodoCubit>().add(
+        title: title,
+        deadline: _deadline,
+        assignedTo: _assignedTo,
+        requiresVerification: _requiresVerification,
+      );
+
+      if (!mounted) return;
+
+      final error = context.read<TodoCubit>().state.error;
+
+      if (error != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error)));
+        return;
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.todo == null
-                  ? 'Task created successfully'
-                  : 'Task updated successfully',
-            ),
-          ),
-        );
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task created successfully')),
+      );
+
+      Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error creating task: $error')));
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
     }
   }
 
   Future<void> _selectDeadline() async {
-    final picked = await showDatePicker(
+    final now = DateTime.now();
+
+    final pickedDate = await showDatePicker(
       context: context,
-      initialDate: _deadline ?? DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
+      initialDate: _deadline ?? now.add(const Duration(days: 1)),
+      firstDate: DateTime(now.year, now.month, now.day),
       lastDate: DateTime(2100),
     );
-    if (picked == null || !mounted) return;
+
+    if (pickedDate == null || !mounted) return;
 
     final pickedTime = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_deadline ?? DateTime.now()),
+      initialTime: _deadline != null
+          ? TimeOfDay.fromDateTime(_deadline!)
+          : TimeOfDay.now(),
     );
+
     if (pickedTime == null || !mounted) return;
 
-    setState(
-      () => _deadline = DateTime(
-        picked.year,
-        picked.month,
-        picked.day,
+    setState(() {
+      _deadline = DateTime(
+        pickedDate.year,
+        pickedDate.month,
+        pickedDate.day,
         pickedTime.hour,
         pickedTime.minute,
-      ),
-    );
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.todo != null;
-
     return Scaffold(
-      appBar: AppBar(title: Text(isEditing ? 'Edit Task' : 'Create Task')),
+      appBar: AppBar(title: const Text('Create Task')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -140,17 +136,19 @@ class _TaskCreateEditPageState extends State<TaskCreateEditPage> {
           children: [
             TextField(
               controller: _titleController,
+              enabled: !_saving,
+              textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
                 labelText: 'Task Title *',
                 hintText: 'Enter task title',
                 border: OutlineInputBorder(),
               ),
-              enabled: !_saving,
             ),
             const SizedBox(height: 16),
+
             InputDecorator(
               decoration: const InputDecoration(
-                labelText: 'Deadline and time',
+                labelText: 'Deadline',
                 border: OutlineInputBorder(),
               ),
               child: Row(
@@ -174,7 +172,11 @@ class _TaskCreateEditPageState extends State<TaskCreateEditPage> {
                       visualDensity: VisualDensity.compact,
                       onPressed: _saving
                           ? null
-                          : () => setState(() => _deadline = null),
+                          : () {
+                              setState(() {
+                                _deadline = null;
+                              });
+                            },
                       icon: const Icon(Icons.close_rounded),
                     ),
                   IconButton(
@@ -186,76 +188,87 @@ class _TaskCreateEditPageState extends State<TaskCreateEditPage> {
                 ],
               ),
             ),
+
             const SizedBox(height: 16),
+
             BlocBuilder<FamilyCubit, FamilyState>(
               builder: (context, state) {
                 final members = state.members;
-                final currentMemberName = members
-                    .where((member) => member.id == widget.userId)
-                    .firstOrNull
-                    ?.name;
-                final otherMembers = members
-                    .where((member) => member.id != widget.userId)
-                    .toList();
-                final hasSelectedMember =
-                    _assignedTo.isEmpty ||
-                    _assignedTo == widget.userId ||
-                    members.any((member) => member.id == _assignedTo);
 
-                return DropdownButtonFormField<String>(
-                  initialValue: _assignedTo,
+                final currentMember = members
+                    .where((member) => member.id == widget.userId)
+                    .firstOrNull;
+
+                return DropdownButtonFormField<String?>(
+                  value: _assignedTo,
                   isExpanded: true,
-                  items: [
-                    const DropdownMenuItem(
-                      value: '',
-                      child: _DropdownLabel('Assign to no one'),
-                    ),
-                    DropdownMenuItem(
-                      value: widget.userId,
-                      child: _DropdownLabel(
-                        currentMemberName == null
-                            ? 'Assign to you'
-                            : 'Assign to you ($currentMemberName)',
-                      ),
-                    ),
-                    ...otherMembers.map(
-                      (member) => DropdownMenuItem(
-                        value: member.id,
-                        child: _DropdownLabel(member.name),
-                      ),
-                    ),
-                    if (!hasSelectedMember)
-                      DropdownMenuItem(
-                        value: _assignedTo,
-                        child: const _DropdownLabel(
-                          'Previously assigned member',
-                        ),
-                      ),
-                  ],
-                  onChanged: _saving
-                      ? null
-                      : (value) {
-                          setState(() => _assignedTo = value ?? '');
-                        },
                   decoration: const InputDecoration(
                     labelText: 'Assign to',
                     border: OutlineInputBorder(),
                   ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: _DropdownLabel('Assign to no one (open task)'),
+                    ),
+
+                    if (currentMember != null)
+                      DropdownMenuItem<String?>(
+                        value: widget.userId,
+                        child: _DropdownLabel('You (${currentMember.name})'),
+                      ),
+
+                    ...members
+                        .where((member) => member.id != widget.userId)
+                        .map(
+                          (member) => DropdownMenuItem<String?>(
+                            value: member.id,
+                            child: _DropdownLabel(member.name),
+                          ),
+                        ),
+                  ],
+                  onChanged: _saving
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _assignedTo = value;
+                          });
+                        },
                 );
               },
             ),
-            const SizedBox(height: 12),
+
+            const SizedBox(height: 8),
+
+            Text(
+              _assignedTo == null
+                  ? 'This task will appear in every family member\'s todo list. '
+                        'Anyone can accept it.'
+                  : 'This task will be assigned directly to the selected member.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
             CheckboxListTile(
               value: _requiresVerification,
               onChanged: _saving
                   ? null
                   : (value) {
-                      setState(() => _requiresVerification = value ?? false);
+                      setState(() {
+                        _requiresVerification = value ?? false;
+                      });
                     },
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
-              title: const Text('Requires verification'),
+              title: const Text('Requires completion verification'),
+              subtitle: const Text(
+                'The task creator must approve the completion.',
+              ),
             ),
+
             const SizedBox(height: 24),
           ],
         ),
@@ -271,7 +284,7 @@ class _TaskCreateEditPageState extends State<TaskCreateEditPage> {
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
-            : const Icon(Icons.check),
+            : const Icon(Icons.check_rounded),
       ),
     );
   }
@@ -284,11 +297,6 @@ class _DropdownLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      overflow: TextOverflow.ellipsis,
-      maxLines: 1,
-      softWrap: false,
-    );
+    return Text(text, overflow: TextOverflow.ellipsis, maxLines: 1);
   }
 }

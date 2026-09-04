@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../family/presentation/bloc/family_cubit.dart';
-// import '../../../tasks/data/models/todo.dart';
 import '../../../tasks/data/repositories/todo_repository.dart';
 import '../../../tasks/presentation/bloc/todo_cubit.dart';
-import '../../../tasks/presentation/pages/task_create_edit_page.dart';
+import '../widgets/todo_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/todo_tile.dart';
 
@@ -22,14 +21,25 @@ class TasksPage extends StatelessWidget {
         if (familyState.loading) {
           return const Center(child: CircularProgressIndicator());
         }
+
+        final familyId = familyState.family?.id;
+
+        if (familyId == null || familyId.isEmpty) {
+          return const EmptyState(
+            icon: Icons.family_restroom_outlined,
+            title: 'No family found',
+            message: 'Join or create a family to manage tasks.',
+          );
+        }
+
         return BlocProvider(
-          key: ValueKey(familyState.family?.id ?? 'personal'),
+          key: ValueKey(familyId),
           create: (_) => TodoCubit(
             repository: context.read<TodoRepository>(),
-            familyId: familyState.family?.id,
+            familyId: familyId,
             userId: userId,
           ),
-          child: _TaskListView(userName: userName, userId: userId),
+          child: _TaskListView(userId: userId, userName: userName),
         );
       },
     );
@@ -37,15 +47,14 @@ class TasksPage extends StatelessWidget {
 }
 
 class _TaskListView extends StatelessWidget {
-  final String userName;
   final String userId;
+  final String userName;
 
-  const _TaskListView({required this.userName, required this.userId});
+  const _TaskListView({required this.userId, required this.userName});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final userId = this.userId;
 
     return BlocBuilder<TodoCubit, TodoState>(
       builder: (context, state) {
@@ -53,35 +62,65 @@ class _TaskListView extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final pendingTasks = state.todos.where((t) => !t.status).toList();
-        final completedTasks = state.todos.where((t) => t.status).toList();
+        if (state.error != null && state.todos.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 48,
+                    color: theme.colorScheme.error,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Unable to load tasks',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(state.error!, textAlign: TextAlign.center),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final pendingTasks = state.todos.where((todo) => !todo.status).toList();
+
+        final completedTasks = state.todos
+            .where((todo) => todo.status)
+            .toList();
+
         final memberNames = {
           for (final member in context.read<FamilyCubit>().state.members)
             member.id: member.name,
         };
+
+        final totalTasks = state.todos.length;
+        final completedCount = completedTasks.length;
 
         return Scaffold(
           backgroundColor: theme.colorScheme.surfaceContainerLowest,
           body: state.todos.isEmpty
               ? const EmptyState(
                   icon: Icons.assignment_turned_in_outlined,
-                  title: 'All caught up!',
-                  message: 'You have no pending tasks. Add a new task for yourself or assign one to your family.',
+                  title: 'No tasks yet',
+                  message: 'Create a task for yourself, assign it to a family member, or leave it open for anyone to accept.',
                 )
               : CustomScrollView(
                   slivers: [
-                    // Task Summary Card Banner
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                         child: _TaskSummaryHeader(
-                          total: state.todos.length,
-                          completed: completedTasks.length,
+                          total: totalTasks,
+                          completed: completedCount,
                         ),
                       ),
                     ),
 
-                    // Pending Tasks Section
                     if (pendingTasks.isNotEmpty) ...[
                       SliverToBoxAdapter(
                         child: Padding(
@@ -90,7 +129,6 @@ class _TaskListView extends StatelessWidget {
                             'Active Tasks (${pendingTasks.length})',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
                             ),
                           ),
                         ),
@@ -103,10 +141,13 @@ class _TaskListView extends StatelessWidget {
                             index,
                           ) {
                             final todo = pendingTasks[index];
+
+                            final isCreator = todo.createdBy == userId;
+
                             return TodoTile(
                               todo: todo,
-                              canEdit: true,
                               userId: userId,
+                              canEdit: isCreator,
                               creatorName: _creatorName(
                                 context,
                                 todo.createdBy,
@@ -118,11 +159,10 @@ class _TaskListView extends StatelessWidget {
                       ),
                     ],
 
-                    // Completed Tasks Section
                     if (completedTasks.isNotEmpty) ...[
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                          padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                           child: Text(
                             'Completed (${completedTasks.length})',
                             style: theme.textTheme.titleMedium?.copyWith(
@@ -140,10 +180,13 @@ class _TaskListView extends StatelessWidget {
                             index,
                           ) {
                             final todo = completedTasks[index];
+
+                            final isCreator = todo.createdBy == userId;
+
                             return TodoTile(
                               todo: todo,
-                              canEdit: true,
                               userId: userId,
+                              canEdit: isCreator,
                               creatorName: _creatorName(
                                 context,
                                 todo.createdBy,
@@ -160,30 +203,10 @@ class _TaskListView extends StatelessWidget {
                 ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () {
-              final familyCubit = context.read<FamilyCubit>();
-              final todoCubit = context.read<TodoCubit>();
-              final familyId = familyCubit.state.family?.id;
-              if (familyId != null && familyId.isNotEmpty) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MultiBlocProvider(
-                      providers: [
-                        BlocProvider.value(value: familyCubit),
-                        BlocProvider.value(value: todoCubit),
-                      ],
-                      child: TaskCreateEditPage(
-                        familyId: familyId,
-                        userId: this.userId,
-                      ),
-                    ),
-                  ),
-                );
-              }
+              showTodoDialog(context);
             },
             icon: const Icon(Icons.add_rounded),
             label: const Text('Add Task'),
-            elevation: 3,
           ),
         );
       },
@@ -191,14 +214,21 @@ class _TaskListView extends StatelessWidget {
   }
 
   String? _creatorName(BuildContext context, String creatorId) {
-    final member = context
-        .read<FamilyCubit>()
-        .state
-        .members
+    final familyCubit = context.read<FamilyCubit>();
+
+    final member = familyCubit.state.members
         .where((member) => member.id == creatorId)
         .firstOrNull;
-    return member?.name ??
-        (creatorId == context.read<TodoCubit>().userId ? userName : null);
+
+    if (member != null) {
+      return member.name;
+    }
+
+    if (creatorId == userId) {
+      return userName;
+    }
+
+    return null;
   }
 }
 
@@ -211,7 +241,8 @@ class _TaskSummaryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final double progress = total == 0 ? 0 : completed / total;
+
+    final progress = total == 0 ? 0.0 : completed / total;
 
     return Container(
       padding: const EdgeInsets.all(20),
